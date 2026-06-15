@@ -10,6 +10,12 @@ pub struct SectionData {
     pub storage: BitArray,
 }
 
+impl Default for SectionData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SectionData {
     /// Create a new section filled with air.
     pub fn new() -> Self {

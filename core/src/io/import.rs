@@ -51,7 +51,7 @@ pub fn validate_save(path: &Path) -> Result<()> {
     let region_count = std::fs::read_dir(&region_dir)
         .map_err(|e| ImportError::ValidationFailed(e.to_string()))?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "mca"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "mca"))
         .count();
 
     if region_count == 0 {
@@ -67,10 +67,8 @@ pub fn validate_save(path: &Path) -> Result<()> {
 pub fn import(path: &Path) -> Result<World> {
     let path_str = path.display().to_string();
 
-    if path.is_dir() {
-        if path.join("level.dat").exists() && path.join("region").is_dir() {
-            return import_minecraft_save(path);
-        }
+    if path.is_dir() && path.join("level.dat").exists() && path.join("region").is_dir() {
+        return import_minecraft_save(path);
     }
 
     if wp_import::is_world_file(path) {

@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use crate::model::dimension::Dimension;
 use crate::model::terrain::Terrain;
-use crate::model::tile::{Tile, TILE_SIZE};
+use crate::model::tile::{TILE_SIZE, Tile};
 use crate::ops::operations::{Operation, OperationError, RestoreHeightsOperation};
 
 /// Determines whether a cell should be modified by an operation.
@@ -150,14 +150,15 @@ impl Operation for FilteredOperation {
 
         // Phase 1: snapshot all cells in brush area (if first apply)
         let snapshot: Vec<(usize, i16)> = if is_first_apply {
-            let tile = dim.tiles.get(&(self.tile_x, self.tile_z)).ok_or(
-                OperationError::OutOfBounds {
-                    tx: self.tile_x,
-                    tz: self.tile_z,
-                    x: 0,
-                    z: 0,
-                },
-            )?;
+            let tile =
+                dim.tiles
+                    .get(&(self.tile_x, self.tile_z))
+                    .ok_or(OperationError::OutOfBounds {
+                        tx: self.tile_x,
+                        tz: self.tile_z,
+                        x: 0,
+                        z: 0,
+                    })?;
 
             let r = self.radius as i32;
             let cx = self.center_x as i32;
@@ -178,24 +179,22 @@ impl Operation for FilteredOperation {
             let _ = self.before_snapshot.set(snap.clone());
             snap
         } else {
-            self.before_snapshot
-                .get()
-                .cloned()
-                .unwrap_or_default()
+            self.before_snapshot.get().cloned().unwrap_or_default()
         };
 
         // Phase 2: apply inner operation
         self.operation.apply(dim)?;
 
         // Phase 3: restore cells that don't pass the filter
-        let tile = dim.tiles.get_mut(&(self.tile_x, self.tile_z)).ok_or(
-            OperationError::OutOfBounds {
-                tx: self.tile_x,
-                tz: self.tile_z,
-                x: 0,
-                z: 0,
-            },
-        )?;
+        let tile =
+            dim.tiles
+                .get_mut(&(self.tile_x, self.tile_z))
+                .ok_or(OperationError::OutOfBounds {
+                    tx: self.tile_x,
+                    tz: self.tile_z,
+                    x: 0,
+                    z: 0,
+                })?;
 
         for &(idx, original_h) in &snapshot {
             let lx = idx % TILE_SIZE;

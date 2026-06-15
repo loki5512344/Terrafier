@@ -46,17 +46,17 @@ impl Region {
         let mut timestamps = [0u32; 1024];
 
         // Read location table (first 4096 bytes: 1024 entries x 4 bytes)
-        for i in 0..1024 {
+        for loc in locations.iter_mut() {
             let mut buf = [0u8; 4];
             reader.read_exact(&mut buf)?;
-            locations[i] = u32::from_be_bytes(buf);
+            *loc = u32::from_be_bytes(buf);
         }
 
         // Read timestamp table (second 4096 bytes: 1024 entries x 4 bytes)
-        for i in 0..1024 {
+        for ts in timestamps.iter_mut() {
             let mut buf = [0u8; 4];
             reader.read_exact(&mut buf)?;
-            timestamps[i] = u32::from_be_bytes(buf);
+            *ts = u32::from_be_bytes(buf);
         }
 
         let mut chunks = HashMap::new();
@@ -111,7 +111,7 @@ impl Region {
                 (local_x, local_z),
                 ChunkEntry {
                     offset: sector_offset,
-                    size: sector_count as u32,
+                    size: sector_count,
                     timestamp,
                     data: Some(decompressed),
                 },
@@ -140,12 +140,15 @@ impl Region {
     /// Set chunk data at local coordinates (0..32, 0..32).
     /// `data` should be decompressed NBT bytes.
     pub fn set_chunk_data(&mut self, local_x: u8, local_z: u8, data: Vec<u8>) {
-        self.chunks.insert((local_x, local_z), ChunkEntry {
-            offset: 0,
-            size: 0,
-            timestamp: 0,
-            data: Some(data),
-        });
+        self.chunks.insert(
+            (local_x, local_z),
+            ChunkEntry {
+                offset: 0,
+                size: 0,
+                timestamp: 0,
+                data: Some(data),
+            },
+        );
     }
 
     /// List all chunk coordinates present in this region.

@@ -71,14 +71,20 @@ impl Tile {
     }
 
     /// Ensure a layer buffer exists, creating an empty one if needed.
-    pub fn ensure_layer(&mut self, layer_id: u32, data_size: crate::model::layers::DataSize) -> &mut LayerBuffer {
+    pub fn ensure_layer(
+        &mut self,
+        layer_id: u32,
+        data_size: crate::model::layers::DataSize,
+    ) -> &mut LayerBuffer {
         use crate::model::layers::DataSize;
         let total = TILE_SIZE * TILE_SIZE;
-        self.layer_data.entry(layer_id).or_insert_with(|| match data_size {
-            DataSize::Bit => LayerBuffer::Bit(vec![0u64; (total + 63) / 64]),
-            DataSize::Nibble => LayerBuffer::Nibble(vec![0u8; (total + 1) / 2]),
-            DataSize::Byte => LayerBuffer::Byte(vec![0u8; total]),
-            DataSize::Int => LayerBuffer::Int(vec![0i32; total]),
-        })
+        self.layer_data
+            .entry(layer_id)
+            .or_insert_with(|| match data_size {
+                DataSize::Bit => LayerBuffer::Bit(vec![0u64; total.div_ceil(64)]),
+                DataSize::Nibble => LayerBuffer::Nibble(vec![0u8; total.div_ceil(2)]),
+                DataSize::Byte => LayerBuffer::Byte(vec![0u8; total]),
+                DataSize::Int => LayerBuffer::Int(vec![0i32; total]),
+            })
     }
 }

@@ -51,10 +51,10 @@ impl<'de> Deserialize<'de> for Dimension {
         let dim = Dim::deserialize(d)?;
         let mut tiles = HashMap::with_capacity(dim.tiles.len());
         for (key, tile) in dim.tiles {
-            if let Some((tx_s, tz_s)) = key.split_once(',') {
-                if let (Ok(tx), Ok(tz)) = (tx_s.parse::<i32>(), tz_s.parse::<i32>()) {
-                    tiles.insert((tx, tz), tile);
-                }
+            if let Some((tx_s, tz_s)) = key.split_once(',')
+                && let (Ok(tx), Ok(tz)) = (tx_s.parse::<i32>(), tz_s.parse::<i32>())
+            {
+                tiles.insert((tx, tz), tile);
             }
         }
         Ok(Self {

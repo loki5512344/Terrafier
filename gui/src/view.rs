@@ -107,27 +107,34 @@ pub fn show_viewport(ui: &mut egui::Ui, app: &mut crate::app::TerrafierApp) {
     );
 
     // Draw selection border
-    if let Some((sel_tx, sel_tz)) = app.selected_tile {
-        if sel_tx >= min_tx && sel_tx <= max_tx && sel_tz >= min_tz && sel_tz <= max_tz {
-            let bx = rect.min.x + (sel_tx - min_tx) as f32 * display_size as f32;
-            let bz = rect.min.y + (sel_tz - min_tz) as f32 * display_size as f32;
-            let border_rect =
-                egui::Rect::from_min_size(egui::pos2(bx, bz), Vec2::splat(display_size as f32));
-            painter.rect_stroke(
-                border_rect,
-                0.0,
-                egui::Stroke::new(3.0, Color32::WHITE),
-                egui::StrokeKind::Middle,
-            );
-        }
+    if let Some((sel_tx, sel_tz)) = app.selected_tile
+        && sel_tx >= min_tx
+        && sel_tx <= max_tx
+        && sel_tz >= min_tz
+        && sel_tz <= max_tz
+    {
+        let bx = rect.min.x + (sel_tx - min_tx) as f32 * display_size as f32;
+        let bz = rect.min.y + (sel_tz - min_tz) as f32 * display_size as f32;
+        let border_rect =
+            egui::Rect::from_min_size(egui::pos2(bx, bz), Vec2::splat(display_size as f32));
+        painter.rect_stroke(
+            border_rect,
+            0.0,
+            egui::Stroke::new(3.0, Color32::WHITE),
+            egui::StrokeKind::Middle,
+        );
     }
 
     // Draw brush position marker
-    if let (Some((sel_tx, sel_tz)), Some(bx), Some(bz)) = (app.selected_tile, app.brush_local_x, app.brush_local_z) {
+    if let (Some((sel_tx, sel_tz)), Some(bx), Some(bz)) =
+        (app.selected_tile, app.brush_local_x, app.brush_local_z)
+    {
         let tile_x_in_pixels = (sel_tx - min_tx) as f32 * display_size as f32;
         let tile_z_in_pixels = (sel_tz - min_tz) as f32 * display_size as f32;
-        let brush_x = rect.min.x + tile_x_in_pixels + (bx as f32 * display_size as f32 / TILE_SIZE as f32);
-        let brush_z = rect.min.y + tile_z_in_pixels + (bz as f32 * display_size as f32 / TILE_SIZE as f32);
+        let brush_x =
+            rect.min.x + tile_x_in_pixels + (bx as f32 * display_size as f32 / TILE_SIZE as f32);
+        let brush_z =
+            rect.min.y + tile_z_in_pixels + (bz as f32 * display_size as f32 / TILE_SIZE as f32);
         let brush_radius_px = app.brush_radius as f32 * display_size as f32 / TILE_SIZE as f32;
         painter.circle_stroke(
             egui::pos2(brush_x, brush_z),
@@ -137,21 +144,26 @@ pub fn show_viewport(ui: &mut egui::Ui, app: &mut crate::app::TerrafierApp) {
     }
 
     // Handle click to select tile
-    if response.clicked() {
-        if let Some(pos) = response.interact_pointer_pos() {
-            let lx = pos.x - rect.min.x;
-            let lz = pos.y - rect.min.y;
-            if lx >= 0.0 && lz >= 0.0 {
-                let tx = (lx / display_size as f32).floor() as i32 + min_tx;
-                let tz = (lz / display_size as f32).floor() as i32 + min_tz;
-                if dim.tiles.contains_key(&(tx, tz)) {
-                    app.selected_tile = Some((tx, tz));
-                    let local_x = ((lx as u32 % display_size) * TILE_SIZE as u32 / display_size).min(127);
-                    let local_z = ((lz as u32 % display_size) * TILE_SIZE as u32 / display_size).min(127);
-                    app.brush_local_x = Some(local_x);
-                    app.brush_local_z = Some(local_z);
-                    app.status_message = format!("Selected tile ({}, {}) at local ({}, {})", tx, tz, local_x, local_z);
-                }
+    if response.clicked()
+        && let Some(pos) = response.interact_pointer_pos()
+    {
+        let lx = pos.x - rect.min.x;
+        let lz = pos.y - rect.min.y;
+        if lx >= 0.0 && lz >= 0.0 {
+            let tx = (lx / display_size as f32).floor() as i32 + min_tx;
+            let tz = (lz / display_size as f32).floor() as i32 + min_tz;
+            if dim.tiles.contains_key(&(tx, tz)) {
+                app.selected_tile = Some((tx, tz));
+                let local_x =
+                    ((lx as u32 % display_size) * TILE_SIZE as u32 / display_size).min(127);
+                let local_z =
+                    ((lz as u32 % display_size) * TILE_SIZE as u32 / display_size).min(127);
+                app.brush_local_x = Some(local_x);
+                app.brush_local_z = Some(local_z);
+                app.status_message = format!(
+                    "Selected tile ({}, {}) at local ({}, {})",
+                    tx, tz, local_x, local_z
+                );
             }
         }
     }

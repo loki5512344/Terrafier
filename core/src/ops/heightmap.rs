@@ -67,7 +67,7 @@ impl HeightMapSource for NoiseHeightMap {
                 let world_z = (tile.z as f64 * tile_size as f64 + lz as f64) * self.scale_z;
 
                 let n = noise_gen.get([world_x * self.frequency, world_z * self.frequency]);
-                let height = (self.base_height + n as f64 * self.amplitude)
+                let height = (self.base_height + n * self.amplitude)
                     .round()
                     .clamp(tile.min_height as f64, tile.max_height as f64)
                     as i16;
@@ -108,16 +108,16 @@ impl HeightMapSource for CombinedHeightMap {
             let mut temp_tile = Tile::new(tile.x, tile.z, tile.min_height, tile.max_height);
             source.generate(&mut temp_tile, seed.wrapping_add(*weight as u64 * 100));
 
-            for i in 0..16384 {
-                accumulated_heights[i] += temp_tile.heightmap[i] as f64 * weight;
+            for (i, acc) in accumulated_heights.iter_mut().enumerate() {
+                *acc += temp_tile.heightmap[i] as f64 * weight;
             }
         }
 
         let weight_sum: f64 = self.sources.iter().map(|(_, w)| w).sum();
 
         if weight_sum > 0.0 {
-            for i in 0..16384 {
-                let h = (accumulated_heights[i] / weight_sum)
+            for (i, acc) in accumulated_heights.iter().enumerate() {
+                let h = (*acc / weight_sum)
                     .round()
                     .clamp(tile.min_height as f64, tile.max_height as f64)
                     as i16;

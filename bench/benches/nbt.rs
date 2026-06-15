@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use terrafier_nbt::tag::Tag;
 use terrafier_nbt::{reader, writer};

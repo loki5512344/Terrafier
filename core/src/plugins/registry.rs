@@ -8,6 +8,12 @@ pub struct PluginRegistry {
     pub sources: Vec<Box<dyn TileSourcePlugin>>,
 }
 
+impl Default for PluginRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PluginRegistry {
     pub fn new() -> Self {
         Self {
@@ -52,22 +58,34 @@ impl PluginRegistry {
     }
 
     /// Find a layer plugin by name.
-    pub fn find_layer_by_name(&self, name: &str) -> Option<&Box<dyn LayerPlugin>> {
-        self.layers.iter().find(|p| p.name() == name)
+    pub fn find_layer_by_name(&self, name: &str) -> Option<&dyn LayerPlugin> {
+        self.layers
+            .iter()
+            .find(|p| p.name() == name)
+            .map(Box::as_ref)
     }
 
     /// Find an operation plugin by name.
-    pub fn find_operation_by_name(&self, name: &str) -> Option<&Box<dyn OperationPlugin>> {
-        self.operations.iter().find(|p| p.name() == name)
+    pub fn find_operation_by_name(&self, name: &str) -> Option<&dyn OperationPlugin> {
+        self.operations
+            .iter()
+            .find(|p| p.name() == name)
+            .map(Box::as_ref)
     }
 
     /// Find an export plugin by name.
-    pub fn find_export_by_name(&self, name: &str) -> Option<&Box<dyn ExportPlugin>> {
-        self.exports.iter().find(|p| p.name() == name)
+    pub fn find_export_by_name(&self, name: &str) -> Option<&dyn ExportPlugin> {
+        self.exports
+            .iter()
+            .find(|p| p.name() == name)
+            .map(Box::as_ref)
     }
 
     /// Find a tile source plugin by name.
-    pub fn find_source_by_name(&self, name: &str) -> Option<&Box<dyn TileSourcePlugin>> {
-        self.sources.iter().find(|p| p.name() == name)
+    pub fn find_source_by_name(&self, name: &str) -> Option<&dyn TileSourcePlugin> {
+        self.sources
+            .iter()
+            .find(|p| p.name() == name)
+            .map(Box::as_ref)
     }
 }

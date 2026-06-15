@@ -84,6 +84,12 @@ pub struct BlockPalette {
     index_map: HashMap<BlockState, u32>,
 }
 
+impl Default for BlockPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlockPalette {
     pub fn new() -> Self {
         BlockPalette {

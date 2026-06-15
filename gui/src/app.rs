@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 
+use terrafier_core::World;
 use terrafier_core::model::terrain::Terrain;
 use terrafier_core::ops::operations::Operation;
-use terrafier_core::World;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ToolMode {
@@ -41,8 +41,6 @@ pub struct TerrafierApp {
     pub brush_local_x: Option<u32>,
     pub brush_local_z: Option<u32>,
     pub show_heightmap: bool,
-    pub zoom: f32,
-    pub view_offset: (f32, f32),
     pub show_new_world: bool,
     pub show_export: bool,
     pub status_message: String,
@@ -67,8 +65,6 @@ impl TerrafierApp {
             brush_local_x: None,
             brush_local_z: None,
             show_heightmap: false,
-            zoom: 1.0,
-            view_offset: (0.0, 0.0),
             show_new_world: false,
             show_export: false,
             status_message: "Ready".to_string(),
@@ -129,19 +125,19 @@ impl eframe::App for TerrafierApp {
                 if ui.button("New World").clicked() {
                     self.show_new_world = true;
                 }
-                if ui.button("Open").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                        match terrafier_core::io::import::import(&path) {
-                            Ok(world) => {
-                                self.world = Some(world);
-                                self.selected_tile = None;
-                                self.undo_stack.clear();
-                                self.redo_stack.clear();
-                                self.status_message = format!("Opened world from {}", path.display());
-                            }
-                            Err(e) => {
-                                self.status_message = format!("Open error: {}", e);
-                            }
+                if ui.button("Open").clicked()
+                    && let Some(path) = rfd::FileDialog::new().pick_folder()
+                {
+                    match terrafier_core::io::import::import(&path) {
+                        Ok(world) => {
+                            self.world = Some(world);
+                            self.selected_tile = None;
+                            self.undo_stack.clear();
+                            self.redo_stack.clear();
+                            self.status_message = format!("Opened world from {}", path.display());
+                        }
+                        Err(e) => {
+                            self.status_message = format!("Open error: {}", e);
                         }
                     }
                 }

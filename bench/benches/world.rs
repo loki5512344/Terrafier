@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use terrafier_core::io::export::render_to_image;
 use terrafier_core::model::brush::SymmetricBrush;
 use terrafier_core::model::terrain::Terrain;
 use terrafier_core::model::world::World;
-use terrafier_core::ops::operations::{
-    HeightOperation, Operation, PaintOperation,
-};
+use terrafier_core::ops::operations::{HeightOperation, Operation, PaintOperation};
 
 fn bench_world_new(c: &mut Criterion) {
     c.bench_function("world/new_default", |b| {

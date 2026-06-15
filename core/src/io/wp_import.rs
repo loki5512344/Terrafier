@@ -53,7 +53,6 @@ const TC_LONGSTRING: u8 = 0x7C;
 const TC_PROXYCLASSDESC: u8 = 0x7D;
 const TC_ENUM: u8 = 0x7E;
 
-const SC_SERIALIZABLE: u8 = 0x02;
 const SC_WRITE_METHOD: u8 = 0x01;
 
 const BASE_WIRE_HANDLE: u32 = 0x7E0000;
@@ -75,7 +74,6 @@ const PRIM_BOOL: u8 = b'Z';
 struct FieldInfo {
     name: String,
     type_code: u8,
-    type_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +92,7 @@ enum JvmValue {
     ByteArray(Vec<i8>),
     ShortArray(Vec<i16>),
     IntArray(Vec<i32>),
-    LongArray(Vec<i64>),
+    LongArray(()),
     Int(i32),
     Long(i64),
     Skipped,
@@ -106,10 +104,10 @@ impl JvmValue {
             JvmValue::String(s) => Some(s.clone()),
             JvmValue::Object(map) => {
                 for key in &["name", "key", "id", "value"] {
-                    if let Some(val) = map.get(*key) {
-                        if let JvmValue::String(s) = val {
-                            return Some(s.clone());
-                        }
+                    if let Some(val) = map.get(*key)
+                        && let JvmValue::String(s) = val
+                    {
+                        return Some(s.clone());
                     }
                 }
                 None
@@ -150,12 +148,20 @@ struct JvmStream {
 
 impl JvmStream {
     fn new(data: Vec<u8>) -> Self {
-        JvmStream { data, pos: 0, handles: Vec::new(), class_descs: Vec::new() }
+        JvmStream {
+            data,
+            pos: 0,
+            handles: Vec::new(),
+            class_descs: Vec::new(),
+        }
     }
 
     fn read_byte(&mut self) -> std::io::Result<u8> {
         if self.pos >= self.data.len() {
-            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "unexpected end of stream"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "unexpected end of stream",
+            ));
         }
         let b = self.data[self.pos];
         self.pos += 1;
@@ -164,7 +170,10 @@ impl JvmStream {
 
     fn read_bytes(&mut self, n: usize) -> std::io::Result<Vec<u8>> {
         if self.pos + n > self.data.len() {
-            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "unexpected end of stream"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "unexpected end of stream",
+            ));
         }
         let slice = self.data[self.pos..self.pos + n].to_vec();
         self.pos += n;
@@ -173,7 +182,10 @@ impl JvmStream {
 
     fn peek_byte(&self) -> std::io::Result<u8> {
         if self.pos >= self.data.len() {
-            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "unexpected end of stream"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "unexpected end of stream",
+            ));
         }
         Ok(self.data[self.pos])
     }
@@ -201,8 +213,14 @@ impl JvmStream {
         let b6 = self.read_byte()? as i64;
         let b7 = self.read_byte()? as i64;
         let b8 = self.read_byte()? as i64;
-        Ok((b1 << 56) | (b2 << 48) | (b3 << 40) | (b4 << 32)
-            | (b5 << 24) | (b6 << 16) | (b7 << 8) | b8)
+        Ok((b1 << 56)
+            | (b2 << 48)
+            | (b3 << 40)
+            | (b4 << 32)
+            | (b5 << 24)
+            | (b6 << 16)
+            | (b7 << 8)
+            | b8)
     }
 
     fn read_f32(&mut self) -> std::io::Result<f32> {
@@ -274,13 +292,11 @@ impl JvmStream {
                 TC_RESET => {
                     self.handles.clear();
                 }
-                TC_EXCEPTION => {
-                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
-                        "unexpected TC_EXCEPTION in stream".to_string()));
-                }
                 _ => {
-                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
-                        format!("unexpected content token: 0x{:02x}", tc)));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("unexpected content token: 0x{:02x}", tc),
+                    ));
                 }
             }
         }
@@ -336,10 +352,10 @@ impl JvmStream {
                 self.push_handle(JvmValue::Skipped);
                 Ok(JvmValue::Skipped)
             }
-            _ => {
-                Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
-                    format!("expected classdesc token, got 0x{:02x}", tc)))
-            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("expected classdesc token, got 0x{:02x}", tc),
+            )),
         }
     }
 
@@ -354,31 +370,26 @@ impl JvmStream {
         for _ in 0..field_count {
             let type_code = self.read_byte()?;
             let name = self.read_utf()?;
-            let type_name = if type_code == b'[' || type_code == b'L' {
+            if type_code == b'[' || type_code == b'L' {
                 let tc = self.read_byte()?;
                 match tc {
                     TC_STRING => {
-                        let s = self.read_utf()?;
-                        Some(s)
+                        self.read_utf()?;
                     }
                     TC_REFERENCE => {
                         let handle = self.read_u32_handle();
                         let idx = (handle - BASE_WIRE_HANDLE) as usize;
                         if idx < self.handles.len() {
-                            self.handles[idx].as_string()
-                        } else {
-                            None
+                            let _ = self.handles[idx].as_string();
                         }
                     }
                     TC_LONGSTRING => {
-                        Some(self.read_long_utf()?)
+                        self.read_long_utf()?;
                     }
-                    _ => None,
+                    _ => {}
                 }
-            } else {
-                None
-            };
-            fields.push(FieldInfo { name, type_code, type_name });
+            }
+            fields.push(FieldInfo { name, type_code });
         }
 
         let cd = ClassDesc {
@@ -432,8 +443,10 @@ impl JvmStream {
                     self.handles.clear();
                 }
                 other => {
-                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
-                        format!("unexpected token in class annotations: 0x{:02x}", other)));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("unexpected token in class annotations: 0x{:02x}", other),
+                    ));
                 }
             }
         }
@@ -459,7 +472,7 @@ impl JvmStream {
                     Some(cd) => cd,
                     None => {
                         // Unknown class, skip object data
-                        let handle = self.push_handle(JvmValue::Skipped);
+                        let _handle = self.push_handle(JvmValue::Skipped);
                         self.skip_object_data(&name)?;
                         return Ok(JvmValue::Skipped);
                     }
@@ -506,7 +519,7 @@ impl JvmStream {
         None
     }
 
-    fn skip_object_data(&mut self, class_name: &str) -> std::io::Result<()> {
+    fn skip_object_data(&mut self, _class_name: &str) -> std::io::Result<()> {
         // Try to read and discard using class annotations
         // This is a best-effort skip
         let saved = self.pos;
@@ -524,7 +537,7 @@ impl JvmStream {
                         return self.read_class_annotations();
                     }
                     // Try to skip a reasonable amount
-                    let remaining = self.data.len() - self.pos;
+                    let _remaining = self.data.len() - self.pos;
                     self.pos = self.data.len();
                     Ok(())
                 } else {
@@ -552,14 +565,14 @@ impl JvmStream {
         // For the class hierarchy, read field data from superclasses
         // We can find the superclass descriptor from the stored class_descs
         let super_name = self.find_super_class_name(&cd.name);
-        if let Some(super_name) = super_name {
-            if !super_name.is_empty() && super_name != "java.lang.Object" {
-                if let Some(super_cd) = self.resolve_class_desc(&super_name) {
-                    let super_fields = self.read_object_fields(&super_cd)?;
-                    if let JvmValue::Object(super_map) = super_fields {
-                        map.extend(super_map);
-                    }
-                }
+        if let Some(super_name) = super_name
+            && !super_name.is_empty()
+            && super_name != "java.lang.Object"
+            && let Some(super_cd) = self.resolve_class_desc(&super_name)
+        {
+            let super_fields = self.read_object_fields(&super_cd)?;
+            if let JvmValue::Object(super_map) = super_fields {
+                map.extend(super_map);
             }
         }
 
@@ -638,11 +651,10 @@ impl JvmStream {
                 JvmValue::IntArray(arr)
             }
             Some(PRIM_LONG) => {
-                let mut arr = Vec::with_capacity(length);
                 for _ in 0..length {
-                    arr.push(self.read_i64()?);
+                    let _ = self.read_i64()?;
                 }
-                JvmValue::LongArray(arr)
+                JvmValue::LongArray(())
             }
             _ => {
                 // Object array — read elements individually
@@ -673,7 +685,9 @@ impl JvmStream {
         for _ in 0..size {
             let key = self.read_content()?;
             let value = self.read_content()?;
-            let key_str = key.as_string().unwrap_or_else(|| format!("__key_{}", map.len()));
+            let key_str = key
+                .as_string()
+                .unwrap_or_else(|| format!("__key_{}", map.len()));
             map.insert(key_str, value);
         }
 
@@ -729,16 +743,16 @@ struct WpWorldData {
 }
 
 fn extract_world_data(val: &JvmValue) -> Result<WpWorldData> {
-    let obj = val.as_object()
-        .ok_or_else(|| WpImportError::InvalidFormat("root object is not a compound object".into()))?;
+    let obj = val.as_object().ok_or_else(|| {
+        WpImportError::InvalidFormat("root object is not a compound object".into())
+    })?;
 
-    let name = obj.get("name")
+    let name = obj
+        .get("name")
         .and_then(|v| v.as_string())
         .unwrap_or_else(|| "WorldPainter World".to_string());
 
-    let seed = obj.get("seed")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
+    let seed = obj.get("seed").and_then(|v| v.as_u64()).unwrap_or(0);
 
     let mut tiles_data = Vec::new();
 
@@ -761,25 +775,34 @@ fn extract_world_data(val: &JvmValue) -> Result<WpWorldData> {
         }
     }
 
-    Ok(WpWorldData { name, seed, tiles: tiles_data })
+    Ok(WpWorldData {
+        name,
+        seed,
+        tiles: tiles_data,
+    })
 }
 
 fn collect_tiles(val: &JvmValue, tiles: &mut Vec<WpTileData>) {
     match val {
         JvmValue::Object(map) => {
             // Check if this is a tile by looking for heightMap/terrain fields
-            if map.contains_key("heightMap") || map.contains_key("terrain") || map.contains_key("waterLevel") {
-                if let Some(tile) = parse_single_tile(val) {
-                    tiles.push(tile);
-                    return;
-                }
+            if (map.contains_key("heightMap")
+                || map.contains_key("terrain")
+                || map.contains_key("waterLevel"))
+                && let Some(tile) = parse_single_tile(val)
+            {
+                tiles.push(tile);
+                return;
             }
             // Could be a map from tile-key (Long) to Tile
             for (_key, sub) in map.iter() {
                 collect_tiles(sub, tiles);
             }
         }
-        JvmValue::ByteArray(_) | JvmValue::ShortArray(_) | JvmValue::IntArray(_) | JvmValue::LongArray(_) => {}
+        JvmValue::ByteArray(_)
+        | JvmValue::ShortArray(_)
+        | JvmValue::IntArray(_)
+        | JvmValue::LongArray(_) => {}
         JvmValue::Skipped => {}
         _ => {}
     }
@@ -794,7 +817,13 @@ fn parse_single_tile(val: &JvmValue) -> Option<WpTileData> {
     let terrain = map.get("terrain").and_then(array_to_u8_16384);
     let water_level = map.get("waterLevel").and_then(array_to_u8_16384);
 
-    Some(WpTileData { x, z, heightmap, terrain, water_level })
+    Some(WpTileData {
+        x,
+        z,
+        heightmap,
+        terrain,
+        water_level,
+    })
 }
 
 fn array_to_heightmap(val: &JvmValue) -> Option<[i16; 16384]> {
@@ -884,10 +913,10 @@ impl WpImporter {
 
 /// Check whether a path looks like a WorldPainter .world file.
 pub fn is_world_file(path: &Path) -> bool {
-    path.extension().map_or(false, |ext| ext == "world")
-        || path.file_name().map_or(false, |name| {
-            name.to_string_lossy().ends_with(".world")
-        })
+    path.extension().is_some_and(|ext| ext == "world")
+        || path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().ends_with(".world"))
 }
 
 /// Import a WorldPainter .world file into a Terrafier World model.
@@ -902,7 +931,8 @@ pub fn import_world_file(path: &Path) -> Result<World> {
     let data = if raw.len() >= 2 && raw[0] == 0x1F && raw[1] == 0x8B {
         let mut decoder = flate2::read::GzDecoder::new(&raw[..]);
         let mut decompressed = Vec::new();
-        decoder.read_to_end(&mut decompressed)
+        decoder
+            .read_to_end(&mut decompressed)
             .map_err(|e| WpImportError::Compression(e.to_string()))?;
         decompressed
     } else {
@@ -911,26 +941,31 @@ pub fn import_world_file(path: &Path) -> Result<World> {
 
     // Validate Java serialization magic
     if data.len() < 4 {
-        return Err(WpImportError::InvalidFormat("file too small after decompression".into()));
+        return Err(WpImportError::InvalidFormat(
+            "file too small after decompression".into(),
+        ));
     }
     let magic = u16::from_be_bytes([data[0], data[1]]);
     if magic != 0xACED {
-        return Err(WpImportError::InvalidFormat(
-            format!("not a Java serialization stream (expected magic ACED, got {:04X})", magic)
-        ));
+        return Err(WpImportError::InvalidFormat(format!(
+            "not a Java serialization stream (expected magic ACED, got {:04X})",
+            magic
+        )));
     }
     let stream_version = u16::from_be_bytes([data[2], data[3]]);
     if stream_version != 5 {
-        return Err(WpImportError::InvalidFormat(
-            format!("unsupported Java serialization stream version: {}", stream_version)
-        ));
+        return Err(WpImportError::InvalidFormat(format!(
+            "unsupported Java serialization stream version: {}",
+            stream_version
+        )));
     }
 
     // Parse the Java serialization stream
     let mut stream = JvmStream::new(data);
 
     // Read the stream header content (the first object)
-    let root = stream.read_content()
+    let root = stream
+        .read_content()
         .map_err(|e| WpImportError::InvalidFormat(e.to_string()))?;
 
     // Extract world data from parsed stream
@@ -945,7 +980,12 @@ pub fn import_world_file(path: &Path) -> Result<World> {
     // Build tiles
     let mut tiles = std::collections::HashMap::new();
     for wp_tile in &world_data.tiles {
-        let mut tile = Tile::new(wp_tile.x, wp_tile.z, platform.min_height, platform.max_height);
+        let mut tile = Tile::new(
+            wp_tile.x,
+            wp_tile.z,
+            platform.min_height,
+            platform.max_height,
+        );
 
         if let Some(hm) = &wp_tile.heightmap {
             tile.heightmap = *hm;

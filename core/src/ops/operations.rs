@@ -3,8 +3,8 @@
 //! Each operation implements the Operation trait and supports undo.
 
 use std::collections::VecDeque;
-use std::sync::OnceLock;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use crate::model::dimension::Dimension;
 use crate::model::terrain::Terrain;
@@ -37,11 +37,7 @@ pub struct HeightOperation {
 
 impl Operation for HeightOperation {
     fn name(&self) -> &'static str {
-        if self.delta >= 0 {
-            "Raise"
-        } else {
-            "Lower"
-        }
+        if self.delta >= 0 { "Raise" } else { "Lower" }
     }
 
     fn apply(&self, dim: &mut Dimension) -> Result<(), OperationError> {
@@ -82,7 +78,7 @@ impl Operation for HeightOperation {
 
                 let change = (self.delta as f64 * strength).round() as i16;
                 let new_height =
-                    (tile.heightmap[idx] as i16 + change).clamp(tile.min_height, tile.max_height);
+                    (tile.heightmap[idx] + change).clamp(tile.min_height, tile.max_height);
                 tile.heightmap[idx] = new_height;
             }
         }
@@ -95,9 +91,7 @@ impl Operation for HeightOperation {
     }
 
     fn inverse(&self) -> Box<dyn Operation> {
-        let snapshot = self.before_snapshot.get()
-            .cloned()
-            .unwrap_or_default();
+        let snapshot = self.before_snapshot.get().cloned().unwrap_or_default();
         Box::new(RestoreHeightsOperation {
             tile_x: self.tile_x,
             tile_z: self.tile_z,
@@ -179,9 +173,7 @@ impl Operation for FlattenOperation {
     }
 
     fn inverse(&self) -> Box<dyn Operation> {
-        let snapshot = self.before_snapshot.get()
-            .cloned()
-            .unwrap_or_default();
+        let snapshot = self.before_snapshot.get().cloned().unwrap_or_default();
         Box::new(RestoreHeightsOperation {
             tile_x: self.tile_x,
             tile_z: self.tile_z,
@@ -250,9 +242,7 @@ impl Operation for PaintOperation {
     }
 
     fn inverse(&self) -> Box<dyn Operation> {
-        let snapshot = self.before_snapshot.get()
-            .cloned()
-            .unwrap_or_default();
+        let snapshot = self.before_snapshot.get().cloned().unwrap_or_default();
         Box::new(RestoreTerrainOperation {
             tile_x: self.tile_x,
             tile_z: self.tile_z,
@@ -414,8 +404,8 @@ impl Operation for SmoothOperation {
                             let bz = az + ny;
                             if bx >= 0 && bx < TILE_SIZE as i32 && bz >= 0 && bz < TILE_SIZE as i32
                             {
-                                sum +=
-                                    tile.heightmap[(bz as usize) * TILE_SIZE + (bx as usize)] as i32;
+                                sum += tile.heightmap[(bz as usize) * TILE_SIZE + (bx as usize)]
+                                    as i32;
                                 count += 1;
                             }
                         }
@@ -463,15 +453,15 @@ impl Operation for ErodeOperation {
     }
 
     fn apply(&self, dim: &mut Dimension) -> Result<(), OperationError> {
-        let tile = dim
-            .tiles
-            .get_mut(&(self.tile_x, self.tile_z))
-            .ok_or(OperationError::OutOfBounds {
-                tx: self.tile_x,
-                tz: self.tile_z,
-                x: 0,
-                z: 0,
-            })?;
+        let tile =
+            dim.tiles
+                .get_mut(&(self.tile_x, self.tile_z))
+                .ok_or(OperationError::OutOfBounds {
+                    tx: self.tile_x,
+                    tz: self.tile_z,
+                    x: 0,
+                    z: 0,
+                })?;
 
         let r = self.radius as i32;
         let cx = self.center_x as i32;
@@ -525,8 +515,7 @@ impl Operation for ErodeOperation {
                     for (ndx, ndz) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
                         let bx = ax + ndx;
                         let bz = az + ndz;
-                        if bx < 0 || bx >= tile_size as i32 || bz < 0 || bz >= tile_size as i32
-                        {
+                        if bx < 0 || bx >= tile_size as i32 || bz < 0 || bz >= tile_size as i32 {
                             continue;
                         }
                         let n_dx = bx - cx;
@@ -605,15 +594,15 @@ impl Operation for FillOperation {
     }
 
     fn apply(&self, dim: &mut Dimension) -> Result<(), OperationError> {
-        let tile = dim
-            .tiles
-            .get_mut(&(self.tile_x, self.tile_z))
-            .ok_or(OperationError::OutOfBounds {
-                tx: self.tile_x,
-                tz: self.tile_z,
-                x: 0,
-                z: 0,
-            })?;
+        let tile =
+            dim.tiles
+                .get_mut(&(self.tile_x, self.tile_z))
+                .ok_or(OperationError::OutOfBounds {
+                    tx: self.tile_x,
+                    tz: self.tile_z,
+                    x: 0,
+                    z: 0,
+                })?;
 
         let cx = self.center_x as usize;
         let cz = self.center_z as usize;
@@ -697,15 +686,15 @@ impl Operation for FloodOperation {
     }
 
     fn apply(&self, dim: &mut Dimension) -> Result<(), OperationError> {
-        let tile = dim
-            .tiles
-            .get_mut(&(self.tile_x, self.tile_z))
-            .ok_or(OperationError::OutOfBounds {
-                tx: self.tile_x,
-                tz: self.tile_z,
-                x: 0,
-                z: 0,
-            })?;
+        let tile =
+            dim.tiles
+                .get_mut(&(self.tile_x, self.tile_z))
+                .ok_or(OperationError::OutOfBounds {
+                    tx: self.tile_x,
+                    tz: self.tile_z,
+                    x: 0,
+                    z: 0,
+                })?;
 
         let r = self.radius as i32;
         let cx = self.center_x as i32;
@@ -765,15 +754,15 @@ impl Operation for PencilOperation {
     }
 
     fn apply(&self, dim: &mut Dimension) -> Result<(), OperationError> {
-        let tile = dim
-            .tiles
-            .get_mut(&(self.tile_x, self.tile_z))
-            .ok_or(OperationError::OutOfBounds {
-                tx: self.tile_x,
-                tz: self.tile_z,
-                x: 0,
-                z: 0,
-            })?;
+        let tile =
+            dim.tiles
+                .get_mut(&(self.tile_x, self.tile_z))
+                .ok_or(OperationError::OutOfBounds {
+                    tx: self.tile_x,
+                    tz: self.tile_z,
+                    x: 0,
+                    z: 0,
+                })?;
 
         let cx = self.center_x as usize;
         let cz = self.center_z as usize;

@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
+use terrafier_core::Terrain;
 use terrafier_core::model::brush::SymmetricBrush;
 use terrafier_core::model::tile::TILE_SIZE;
 use terrafier_core::ops::operations::{
     FlattenOperation, HeightOperation, MultiTileOperation, Operation, PaintOperation,
     SmoothOperation,
 };
-use terrafier_core::Terrain;
 
 use crate::app::{TerrafierApp, ToolMode};
 
@@ -103,8 +103,10 @@ fn apply_tool(app: &mut TerrafierApp) {
 
     for otx in min_tx..=max_tx {
         for otz in min_tz..=max_tz {
-            let local_cx = (global_cx - otx * TILE_SIZE as i32).clamp(0, TILE_SIZE as i32 - 1) as u32;
-            let local_cz = (global_cz - otz * TILE_SIZE as i32).clamp(0, TILE_SIZE as i32 - 1) as u32;
+            let local_cx =
+                (global_cx - otx * TILE_SIZE as i32).clamp(0, TILE_SIZE as i32 - 1) as u32;
+            let local_cz =
+                (global_cz - otz * TILE_SIZE as i32).clamp(0, TILE_SIZE as i32 - 1) as u32;
 
             if dim.tiles.contains_key(&(otx, otz)) {
                 let brush = Arc::new(SymmetricBrush::new(app.brush_radius as f64));

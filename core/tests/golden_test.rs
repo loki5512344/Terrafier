@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use terrafier_core::io::minecraft::load_save;
 use terrafier_fastanvil::io::chunk::Chunk;
 use terrafier_fastanvil::io::region::Region;
+use terrafier_nbt::Tag;
 use terrafier_nbt::io::reader::read_gzip;
 use terrafier_nbt::io::writer::to_gzip_bytes;
-use terrafier_nbt::Tag;
 
 // ---------------------------------------------------------------------------
 // Helpers: synthetic NBT and region file writer
@@ -48,10 +48,7 @@ fn make_chunk_nbt_gzip(cx: i32, cz: i32) -> Vec<u8> {
     // block_states with a single-entry palette
     let mut palette_list: Vec<Tag> = Vec::new();
     let mut grass = HashMap::new();
-    grass.insert(
-        "Name".into(),
-        Tag::String("minecraft:grass_block".into()),
-    );
+    grass.insert("Name".into(), Tag::String("minecraft:grass_block".into()));
     palette_list.push(Tag::Compound(grass));
     let mut block_states = HashMap::new();
     block_states.insert("palette".into(), Tag::List(palette_list));
@@ -164,7 +161,9 @@ fn test_golden_mca_roundtrip() {
     let coords = region.chunk_coords();
     assert_eq!(coords, vec![(0, 0)]);
 
-    let raw = region.get_chunk_data(0, 0).expect("chunk (0,0) should exist");
+    let raw = region
+        .get_chunk_data(0, 0)
+        .expect("chunk (0,0) should exist");
     assert!(!raw.is_empty(), "chunk data should not be empty");
 
     // The stored payload is gzip-compressed NBT → decompress via read_gzip
@@ -175,11 +174,7 @@ fn test_golden_mca_roundtrip() {
     assert_eq!(chunk.x, 0, "chunk xPos");
     assert_eq!(chunk.z, 0, "chunk zPos");
     assert_eq!(chunk.data_version, 3954, "chunk DataVersion");
-    assert_eq!(
-        chunk.status.as_deref(),
-        Some("full"),
-        "chunk Status"
-    );
+    assert_eq!(chunk.status.as_deref(), Some("full"), "chunk Status");
 
     // Sections
     assert_eq!(chunk.sections.len(), 1, "should have 1 section");
@@ -211,5 +206,9 @@ fn test_golden_mca_roundtrip() {
     // --- 4. Region round-trip via to_bytes / from_bytes ---
     let reencoded = region.to_bytes().expect("region should re-serialize");
     let region2 = Region::from_bytes(0, 0, &reencoded).expect("re-serialized region should parse");
-    assert_eq!(region2.chunk_count(), 1, "round-tripped region should still have 1 chunk");
+    assert_eq!(
+        region2.chunk_count(),
+        1,
+        "round-tripped region should still have 1 chunk"
+    );
 }

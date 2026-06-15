@@ -84,12 +84,12 @@ impl LayerExport for CavesLayerExport {
         let data = tile.get_layer_data(LAYER_CAVES)?;
         if let LayerBuffer::Nibble(nibbles) = data {
             let byte = nibbles[idx / 2];
-            let value = if idx % 2 == 0 { byte >> 4 } else { byte & 0xF };
-            if value > 0
-                && y < surface_y
-                && y >= surface_y - 12
-                && y > -60
-            {
+            let value = if idx.is_multiple_of(2) {
+                byte >> 4
+            } else {
+                byte & 0xF
+            };
+            if value > 0 && y < surface_y && y >= surface_y - 12 && y > -60 {
                 match block_name {
                     "minecraft:stone"
                     | "minecraft:deepslate"
@@ -247,7 +247,11 @@ impl LayerExport for ResourcesLayerExport {
         let data = tile.get_layer_data(LAYER_RESOURCES)?;
         if let LayerBuffer::Nibble(nibbles) = data {
             let byte = nibbles[idx / 2];
-            let value = if idx % 2 == 0 { byte >> 4 } else { byte & 0xF };
+            let value = if idx.is_multiple_of(2) {
+                byte >> 4
+            } else {
+                byte & 0xF
+            };
             if value > 0 && block_name == "minecraft:stone" && y > -60 {
                 let ore = match value {
                     1 => "minecraft:coal_ore",

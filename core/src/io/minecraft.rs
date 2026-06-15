@@ -1,19 +1,22 @@
 //! Minecraft world I/O — read and write Java Edition saves.
 
-use std::collections::HashMap;
+use log;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use log;
 
 use terrafier_fastanvil::io::region::Region;
 use terrafier_nbt::io::reader::read_gzip;
 
+use crate::io::layer_export::{LayerExport, apply_layers, biome_name};
 use crate::model::dimension::Dimension;
 use crate::model::platform::Platform;
-use crate::io::layer_export::{apply_layers, biome_name, LayerExport};
 use crate::model::tile::Tile;
 use crate::model::world::World;
+
+#[allow(clippy::type_complexity)]
+type RegionTiles<'a> = BTreeMap<(i32, i32), Vec<(&'a (i32, i32), &'a Tile)>>;
 
 #[derive(Error, Debug)]
 pub enum MinecraftIOError {
@@ -49,14 +52,17 @@ pub fn version_from_data_version(dv: i32) -> Option<Platform> {
             max_height: 320,
         }),
         2866..=2974 => {
-            log::warn!("DataVersion {} is between 1.18 and 1.19, falling back to 1.18", dv);
+            log::warn!(
+                "DataVersion {} is between 1.18 and 1.19, falling back to 1.18",
+                dv
+            );
             Some(Platform {
                 id: "java_1_18".into(),
                 display_name: "Minecraft Java 1.18".into(),
                 min_height: -64,
                 max_height: 320,
             })
-        },
+        }
         2975..=3117 => Some(Platform {
             id: "java_1_19".into(),
             display_name: "Minecraft Java 1.19".into(),
@@ -64,14 +70,17 @@ pub fn version_from_data_version(dv: i32) -> Option<Platform> {
             max_height: 320,
         }),
         3118..=3336 => {
-            log::warn!("DataVersion {} is between 1.19 and 1.20, falling back to 1.19", dv);
+            log::warn!(
+                "DataVersion {} is between 1.19 and 1.20, falling back to 1.19",
+                dv
+            );
             Some(Platform {
                 id: "java_1_19".into(),
                 display_name: "Minecraft Java 1.19".into(),
                 min_height: -64,
                 max_height: 320,
             })
-        },
+        }
         3337..=3460 => Some(Platform {
             id: "java_1_20".into(),
             display_name: "Minecraft Java 1.20".into(),
@@ -79,14 +88,17 @@ pub fn version_from_data_version(dv: i32) -> Option<Platform> {
             max_height: 320,
         }),
         3461..=3577 => {
-            log::warn!("DataVersion {} is between 1.20 and 1.20.5, falling back to 1.20", dv);
+            log::warn!(
+                "DataVersion {} is between 1.20 and 1.20.5, falling back to 1.20",
+                dv
+            );
             Some(Platform {
                 id: "java_1_20".into(),
                 display_name: "Minecraft Java 1.20 (fallback)".into(),
                 min_height: -64,
                 max_height: 320,
             })
-        },
+        }
         3578..=3700 => Some(Platform {
             id: "java_1_20_5".into(),
             display_name: "Minecraft Java 1.20.5+".into(),
@@ -94,14 +106,17 @@ pub fn version_from_data_version(dv: i32) -> Option<Platform> {
             max_height: 320,
         }),
         3701..=3818 => {
-            log::warn!("DataVersion {} is between 1.20.5 and 1.21, falling back to 1.20.5", dv);
+            log::warn!(
+                "DataVersion {} is between 1.20.5 and 1.21, falling back to 1.20.5",
+                dv
+            );
             Some(Platform {
                 id: "java_1_20_5".into(),
                 display_name: "Minecraft Java 1.20.5 (fallback)".into(),
                 min_height: -64,
                 max_height: 320,
             })
-        },
+        }
         3819..=3953 => Some(Platform {
             id: "java_1_21".into(),
             display_name: "Minecraft Java 1.21".into(),
@@ -148,103 +163,87 @@ pub fn load_save(path: &Path) -> Result<World> {
     for entry in region_entries {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == "mca") {
+        if path.extension().is_some_and(|e| e == "mca") {
             let file_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             let parts: Vec<&str> = file_name.split('.').collect();
-            if parts.len() >= 3 {
-                if let (Ok(rx), Ok(rz)) = (parts[1].parse::<i32>(), parts[2].parse::<i32>()) {
-                    let region_bytes = fs::read(&path)?;
-                    let region = Region::from_bytes(rx, rz, &region_bytes)?;
-                    for (local_x, local_z) in region.chunk_coords() {
-                        let chunk_data = region.get_chunk_data(local_x, local_z).unwrap();
-                        if let Ok(chunk_tag) = read_gzip(chunk_data) {
-                            if let Some(chunk) =
-                                terrafier_fastanvil::io::chunk::Chunk::from_nbt(&chunk_tag)
-                            {
-                                let tile_x = chunk.x >> 3;
-                                let tile_z = chunk.z >> 3;
+            if parts.len() >= 3
+                && let (Ok(rx), Ok(rz)) = (parts[1].parse::<i32>(), parts[2].parse::<i32>())
+            {
+                let region_bytes = fs::read(&path)?;
+                let region = Region::from_bytes(rx, rz, &region_bytes)?;
+                for (local_x, local_z) in region.chunk_coords() {
+                    let chunk_data = region.get_chunk_data(local_x, local_z).unwrap();
+                    if let Ok(chunk_tag) = read_gzip(chunk_data)
+                        && let Some(chunk) =
+                            terrafier_fastanvil::io::chunk::Chunk::from_nbt(&chunk_tag)
+                    {
+                        let tile_x = chunk.x >> 3;
+                        let tile_z = chunk.z >> 3;
 
-                                // 8 chunks per tile (128 blocks / 16 blocks per chunk)
-                                let chunk_local_x = (chunk.x & 7) as usize;
-                                let chunk_local_z = (chunk.z & 7) as usize;
+                        // 8 chunks per tile (128 blocks / 16 blocks per chunk)
+                        let chunk_local_x = (chunk.x & 7) as usize;
+                        let chunk_local_z = (chunk.z & 7) as usize;
 
-                                let tile = tiles
-                                    .entry((tile_x, tile_z))
-                                    .or_insert_with(|| Tile::new(
-                                        tile_x,
-                                        tile_z,
-                                        platform.min_height,
-                                        platform.max_height,
-                                    ));
+                        let tile = tiles.entry((tile_x, tile_z)).or_insert_with(|| {
+                            Tile::new(tile_x, tile_z, platform.min_height, platform.max_height)
+                        });
 
-                                for lx in 0..16usize {
-                                    for lz in 0..16usize {
-                                        let mut surface_y = None;
+                        for lx in 0..16usize {
+                            for lz in 0..16usize {
+                                let mut surface_y = None;
 
-                                        if !chunk.sections.is_empty() {
-                                            let mut sorted: Vec<_> =
-                                                chunk.sections.iter().collect();
-                                            sorted
-                                                .sort_by(|a, b| b.section_y.cmp(&a.section_y));
+                                if !chunk.sections.is_empty() {
+                                    let mut sorted: Vec<_> = chunk.sections.iter().collect();
+                                    sorted.sort_by_key(|b| std::cmp::Reverse(b.section_y));
 
-                                            for section in &sorted {
-                                                if section.palette.is_empty() {
-                                                    continue;
-                                                }
-
-                                                let has_blocks =
-                                                    section.palette.iter().any(|p| {
-                                                        p.get("Name").map_or(false, |n| {
-                                                            matches!(
-                                                                n,
-                                                                terrafier_nbt::Tag::String(s)
-                                                                    if s != "minecraft:air"
-                                                            )
-                                                        })
-                                                    });
-
-                                                if !has_blocks {
-                                                    continue;
-                                                }
-
-                                                if section.block_data.is_empty() {
-                                                    if section.palette[0]
-                                                        .get("Name")
-                                                        .map_or(false, |n| {
-                                                            matches!(
-                                                                n,
-                                                                terrafier_nbt::Tag::String(s)
-                                                                    if s == "minecraft:air"
-                                                            )
-                                                        })
-                                                    {
-                                                        continue;
-                                                    }
-                                                    surface_y = Some(
-                                                        (section.section_y as i32) * 16 + 15,
-                                                    );
-                                                    break;
-                                                }
-
-                                                surface_y = Some(
-                                                    (section.section_y as i32) * 16 + 15,
-                                                );
-                                                break;
-                                            }
+                                    for section in &sorted {
+                                        if section.palette.is_empty() {
+                                            continue;
                                         }
 
-                                        let tile_local_x = chunk_local_x * 16 + lx;
-                                        let tile_local_z = chunk_local_z * 16 + lz;
+                                        let has_blocks = section.palette.iter().any(|p| {
+                                            p.get("Name").is_some_and(|n| {
+                                                matches!(
+                                                    n,
+                                                    terrafier_nbt::Tag::String(s)
+                                                        if s != "minecraft:air"
+                                                )
+                                            })
+                                        });
 
-                                        if tile_local_x < 128 && tile_local_z < 128 {
-                                            if let Some(y) = surface_y {
-                                                let clamped = (y as i16)
-                                                    .clamp(tile.min_height, tile.max_height);
-                                                tile.heightmap
-                                                    [tile_local_z * 128 + tile_local_x] = clamped;
-                                            }
+                                        if !has_blocks {
+                                            continue;
                                         }
+
+                                        if section.block_data.is_empty() {
+                                            if section.palette[0].get("Name").is_some_and(|n| {
+                                                matches!(
+                                                    n,
+                                                    terrafier_nbt::Tag::String(s)
+                                                        if s == "minecraft:air"
+                                                )
+                                            }) {
+                                                continue;
+                                            }
+                                            surface_y = Some((section.section_y as i32) * 16 + 15);
+                                            break;
+                                        }
+
+                                        surface_y = Some((section.section_y as i32) * 16 + 15);
+                                        break;
                                     }
+                                }
+
+                                let tile_local_x = chunk_local_x * 16 + lx;
+                                let tile_local_z = chunk_local_z * 16 + lz;
+
+                                if tile_local_x < 128
+                                    && tile_local_z < 128
+                                    && let Some(y) = surface_y
+                                {
+                                    let clamped =
+                                        (y as i16).clamp(tile.min_height, tile.max_height);
+                                    tile.heightmap[tile_local_z * 128 + tile_local_x] = clamped;
                                 }
                             }
                         }
@@ -272,8 +271,6 @@ pub fn load_save(path: &Path) -> Result<World> {
 
 /// Save a Terrafier World to a Minecraft save directory.
 pub fn save_world(world: &World, output_path: &Path) -> Result<()> {
-    use std::collections::BTreeMap;
-
     fs::create_dir_all(output_path.join("region"))?;
 
     // Write level.dat
@@ -287,7 +284,7 @@ pub fn save_world(world: &World, output_path: &Path) -> Result<()> {
     };
 
     // Group tiles by region (512×512 blocks = 4×4 tiles of 128×128 each)
-    let mut regions: BTreeMap<(i32, i32), Vec<(&(i32, i32), &Tile)>> = BTreeMap::new();
+    let mut regions: RegionTiles = BTreeMap::new();
     for (key, tile) in &dim.tiles {
         let (tx, tz) = key;
         let rx = tx >> 2;
@@ -345,7 +342,7 @@ fn pack_indices(indices: &[u16], bits: usize) -> Vec<i64> {
         return Vec::new();
     }
     let total_bits = indices.len() * bits;
-    let longs = (total_bits + 63) / 64;
+    let longs = total_bits.div_ceil(64);
     let mut data = vec![0i64; longs];
     let mask = (1i64 << bits) - 1;
     for (i, &idx) in indices.iter().enumerate() {
@@ -459,11 +456,14 @@ fn build_chunk_nbt(
         let bits = bits_needed(BLOCK_SET.len());
         let packed = pack_indices(&indices, bits);
 
-        let palette_tags: Vec<terrafier_nbt::Tag> = BLOCK_SET.iter().map(|name| {
-            let mut entry = HashMap::new();
-            entry.insert("Name".into(), terrafier_nbt::Tag::String(name.to_string()));
-            terrafier_nbt::Tag::Compound(entry)
-        }).collect();
+        let palette_tags: Vec<terrafier_nbt::Tag> = BLOCK_SET
+            .iter()
+            .map(|name| {
+                let mut entry = HashMap::new();
+                entry.insert("Name".into(), terrafier_nbt::Tag::String(name.to_string()));
+                terrafier_nbt::Tag::Compound(entry)
+            })
+            .collect();
 
         let mut block_states = HashMap::new();
         block_states.insert("palette".into(), terrafier_nbt::Tag::List(palette_tags));
@@ -471,7 +471,10 @@ fn build_chunk_nbt(
 
         let biome_palette = vec![{
             let mut b = HashMap::new();
-            b.insert("Name".into(), terrafier_nbt::Tag::String("minecraft:plains".into()));
+            b.insert(
+                "Name".into(),
+                terrafier_nbt::Tag::String("minecraft:plains".into()),
+            );
             terrafier_nbt::Tag::Compound(b)
         }];
         let mut biomes = HashMap::new();
@@ -479,7 +482,10 @@ fn build_chunk_nbt(
 
         let mut sec_compound = HashMap::new();
         sec_compound.insert("Y".into(), terrafier_nbt::Tag::Byte(sec_y as i8));
-        sec_compound.insert("block_states".into(), terrafier_nbt::Tag::Compound(block_states));
+        sec_compound.insert(
+            "block_states".into(),
+            terrafier_nbt::Tag::Compound(block_states),
+        );
         sec_compound.insert("biomes".into(), terrafier_nbt::Tag::Compound(biomes));
 
         sections.push(terrafier_nbt::Tag::Compound(sec_compound));
@@ -557,7 +563,15 @@ fn build_chunk_nbt_with_layers(
                         let surface_y = tile.heightmap[tile_lz * 128 + tile_lx] as i32;
                         let terrain_id = tile.terrain[tile_lz * 128 + tile_lx];
                         let base_name = block_name(terrain_id, global_y, surface_y);
-                        let name = apply_layers(tile, tile_lx, tile_lz, global_y, surface_y, base_name, layer_exporters);
+                        let name = apply_layers(
+                            tile,
+                            tile_lx,
+                            tile_lz,
+                            global_y,
+                            surface_y,
+                            base_name,
+                            layer_exporters,
+                        );
                         BLOCK_SET.iter().position(|s| *s == name).unwrap_or(0) as u16
                     };
                     indices.push(idx);
@@ -585,20 +599,26 @@ fn build_chunk_nbt_with_layers(
         for (pi, name) in used_blocks.iter().enumerate() {
             palette_map.insert(name, pi as u16);
         }
-        let remapped: Vec<u16> = indices.iter().map(|&i| {
-            if i < BLOCK_SET.len() as u16 {
-                palette_map[BLOCK_SET[i as usize]]
-            } else {
-                0
-            }
-        }).collect();
+        let remapped: Vec<u16> = indices
+            .iter()
+            .map(|&i| {
+                if i < BLOCK_SET.len() as u16 {
+                    palette_map[BLOCK_SET[i as usize]]
+                } else {
+                    0
+                }
+            })
+            .collect();
         let packed = pack_indices(&remapped, bits);
 
-        let palette_tags: Vec<terrafier_nbt::Tag> = used_blocks.iter().map(|name| {
-            let mut entry = HashMap::new();
-            entry.insert("Name".into(), terrafier_nbt::Tag::String(name.to_string()));
-            terrafier_nbt::Tag::Compound(entry)
-        }).collect();
+        let palette_tags: Vec<terrafier_nbt::Tag> = used_blocks
+            .iter()
+            .map(|name| {
+                let mut entry = HashMap::new();
+                entry.insert("Name".into(), terrafier_nbt::Tag::String(name.to_string()));
+                terrafier_nbt::Tag::Compound(entry)
+            })
+            .collect();
 
         let mut block_states = HashMap::new();
         block_states.insert("palette".into(), terrafier_nbt::Tag::List(palette_tags));
@@ -615,7 +635,10 @@ fn build_chunk_nbt_with_layers(
 
         let mut sec_compound = HashMap::new();
         sec_compound.insert("Y".into(), terrafier_nbt::Tag::Byte(sec_y as i8));
-        sec_compound.insert("block_states".into(), terrafier_nbt::Tag::Compound(block_states));
+        sec_compound.insert(
+            "block_states".into(),
+            terrafier_nbt::Tag::Compound(block_states),
+        );
         sec_compound.insert("biomes".into(), terrafier_nbt::Tag::Compound(biomes));
 
         sections.push(terrafier_nbt::Tag::Compound(sec_compound));
@@ -638,8 +661,6 @@ pub fn save_world_with_layers(
     output_path: &Path,
     layer_exporters: &[&dyn LayerExport],
 ) -> Result<()> {
-    use std::collections::BTreeMap;
-
     fs::create_dir_all(output_path.join("region"))?;
 
     let level_tag = build_level_dat(world)?;
@@ -651,7 +672,7 @@ pub fn save_world_with_layers(
         None => return Ok(()),
     };
 
-    let mut regions: BTreeMap<(i32, i32), Vec<(&(i32, i32), &Tile)>> = BTreeMap::new();
+    let mut regions: RegionTiles = BTreeMap::new();
     for (key, tile) in &dim.tiles {
         let (tx, tz) = key;
         let rx = tx >> 2;
@@ -671,7 +692,14 @@ pub fn save_world_with_layers(
                     let region_local_x = (chunk_x & 31) as u8;
                     let region_local_z = (chunk_z & 31) as u8;
 
-                    let chunk_data = build_chunk_nbt_with_layers(chunk_x, chunk_z, tile, chunk_lx, chunk_lz, layer_exporters)?;
+                    let chunk_data = build_chunk_nbt_with_layers(
+                        chunk_x,
+                        chunk_z,
+                        tile,
+                        chunk_lx,
+                        chunk_lz,
+                        layer_exporters,
+                    )?;
 
                     if chunk_data.is_empty() {
                         continue;
@@ -746,7 +774,7 @@ pub fn discover_region_files(world_path: &Path) -> Result<Vec<PathBuf>> {
     for entry in fs::read_dir(&region_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == "mca") {
+        if path.extension().is_some_and(|e| e == "mca") {
             files.push(path);
         }
     }

@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use terrafier_core::io::export::render_to_image;
 use terrafier_core::model::tile::Tile;
