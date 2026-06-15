@@ -1,0 +1,25 @@
+[package]
+name = "terrafier-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+criterion.workspace = true
+serde_json.workspace = true
+
+terrafier-core = { path = "../core" }
+terrafier-nbt = { path = "../crates/nbt" }
+
+[[bench]]
+name = "nbt"
+harness = false
+
+[[bench]]
+name = "render"
+harness = false
+
+[[bench]]
+name = "world"
+harness = false

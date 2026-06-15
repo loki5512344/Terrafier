@@ -1,0 +1,25 @@
+[package]
+name = "terrafier-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core library for Terrafier — world model, Minecraft I/O, export pipeline"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+rayon.workspace = true
+log.workspace = true
+
+terrafier-nbt = { path = "../crates/nbt" }
+terrafier-fastanvil = { path = "../crates/fastanvil" }
+terrafier-noise = { path = "../crates/noise" }
+
+serde-big-array.workspace = true
+
+bincode.workspace = true
+
+image.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

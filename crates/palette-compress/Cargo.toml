@@ -1,0 +1,11 @@
+[package]
+name = "terrafier-palette-compress"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Block palette compression for Anvil format"
+
+[dependencies]
+terrafier-nbt = { path = "../nbt" }
+serde.workspace = true
+thiserror.workspace = true

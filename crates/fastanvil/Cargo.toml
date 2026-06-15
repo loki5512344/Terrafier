@@ -1,0 +1,12 @@
+﻿[package]
+name = "terrafier-fastanvil"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Fast Anvil/MCRegion format reader and writer for Minecraft world files"
+
+[dependencies]
+terrafier-nbt = { path = "../nbt" }
+thiserror.workspace = true
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+rayon.workspace = true

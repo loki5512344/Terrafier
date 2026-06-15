@@ -1,0 +1,16 @@
+[package]
+name = "terrafier-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native GUI for Terrafier — interactive world painting with GPU rendering"
+
+[dependencies]
+terrafier-core = { path = "../core" }
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true
+
+egui = "0.31"
+eframe = "0.31"
+rfd = "0.15"

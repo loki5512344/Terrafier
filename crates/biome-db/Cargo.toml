@@ -1,0 +1,10 @@
+[package]
+name = "terrafier-biome-db"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Biome database for Terrafier — biome IDs and names for all Minecraft versions"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
