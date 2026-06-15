@@ -20,6 +20,7 @@ serde-big-array.workspace = true
 bincode.workspace = true
 
 image.workspace = true
+flate2.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

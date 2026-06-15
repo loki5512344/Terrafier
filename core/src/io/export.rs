@@ -3,6 +3,7 @@
 use std::path::Path;
 use thiserror::Error;
 
+use crate::io::layer_export::LayerExport;
 use crate::io::minecraft::MinecraftIOError;
 use crate::model::world::World;
 
@@ -23,6 +24,16 @@ pub type Result<T> = std::result::Result<T, ExportError>;
 /// Export a Terrafier World to a Minecraft save directory.
 pub fn export_to_save(world: &World, output_path: &Path) -> Result<()> {
     crate::io::minecraft::save_world(world, output_path)?;
+    Ok(())
+}
+
+/// Export a Terrafier World to a Minecraft save directory, applying layer exporters.
+pub fn export_to_save_with_layers(
+    world: &World,
+    output_path: &Path,
+    layer_exporters: &[&dyn LayerExport],
+) -> Result<()> {
+    crate::io::minecraft::save_world_with_layers(world, output_path, layer_exporters)?;
     Ok(())
 }
 

@@ -59,4 +59,26 @@ impl Tile {
     pub fn set_terrain(&mut self, lx: usize, lz: usize, terrain: u8) {
         self.terrain[lz * TILE_SIZE + lx] = terrain;
     }
+
+    /// Get layer data buffer for a given layer ID.
+    pub fn get_layer_data(&self, layer_id: u32) -> Option<&LayerBuffer> {
+        self.layer_data.get(&layer_id)
+    }
+
+    /// Set layer data buffer for a given layer ID.
+    pub fn set_layer_data(&mut self, layer_id: u32, data: LayerBuffer) {
+        self.layer_data.insert(layer_id, data);
+    }
+
+    /// Ensure a layer buffer exists, creating an empty one if needed.
+    pub fn ensure_layer(&mut self, layer_id: u32, data_size: crate::model::layers::DataSize) -> &mut LayerBuffer {
+        use crate::model::layers::DataSize;
+        let total = TILE_SIZE * TILE_SIZE;
+        self.layer_data.entry(layer_id).or_insert_with(|| match data_size {
+            DataSize::Bit => LayerBuffer::Bit(vec![0u64; (total + 63) / 64]),
+            DataSize::Nibble => LayerBuffer::Nibble(vec![0u8; (total + 1) / 2]),
+            DataSize::Byte => LayerBuffer::Byte(vec![0u8; total]),
+            DataSize::Int => LayerBuffer::Int(vec![0i32; total]),
+        })
+    }
 }

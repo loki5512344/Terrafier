@@ -4,6 +4,7 @@ use std::path::Path;
 use thiserror::Error;
 
 use crate::io::minecraft::MinecraftIOError;
+use crate::io::wp_import;
 use crate::model::world::World;
 
 #[derive(Error, Debug)]
@@ -70,6 +71,11 @@ pub fn import(path: &Path) -> Result<World> {
         if path.join("level.dat").exists() && path.join("region").is_dir() {
             return import_minecraft_save(path);
         }
+    }
+
+    if wp_import::is_world_file(path) {
+        return wp_import::import_world_file(path)
+            .map_err(|e| ImportError::UnsupportedFormat(e.to_string()));
     }
 
     Err(ImportError::UnsupportedFormat(path_str))
