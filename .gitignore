@@ -17,5 +17,9 @@ Thumbs.db
 *.mca
 *.mcr
 
+# Agent
+AGENTS.md
+.opencode/
+
 # Logs
 *.log

@@ -3,8 +3,7 @@ use std::sync::Arc;
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use terrafier_core::io::export::render_to_image;
-use terrafier_core::model::brush::SymmetricBrush;
-use terrafier_core::model::terrain::Terrain;
+use terrafier_core::model::types::{SymmetricBrush, Terrain};
 use terrafier_core::model::world::World;
 use terrafier_core::ops::operations::{HeightOperation, Operation, PaintOperation};
 

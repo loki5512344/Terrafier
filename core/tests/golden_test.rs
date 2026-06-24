@@ -151,9 +151,11 @@ fn test_golden_mca_roundtrip() {
     assert_eq!(dim.name, "overworld");
     assert_eq!(dim.seed, 42);
 
-    // Note: load_save currently has a TODO on line 129 of minecraft.rs —
-    // parsed chunks are not yet dispatched to tiles, so tiles is always
-    // empty after loading. We verify chunk parsing via the direct test below.
+    // Chunks are dispatched to tiles; verify we have data.
+    assert!(!dim.tiles.is_empty(), "tiles should contain parsed chunks");
+    let tile = dim.tiles.get(&(0, 0)).expect("tile (0,0) should exist");
+    // Chunk at global (0,0) → tile (0,0), height = 4 * 16 + 15 = 79
+    assert_eq!(tile.heightmap[0], 79, "first block height should be 79");
 
     // --- 2. Direct region + chunk parsing verification ---
     let region = Region::from_bytes(0, 0, &region_bytes).expect("region should parse");

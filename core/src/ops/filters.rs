@@ -1,44 +1,35 @@
 //! Filter system — restrict which cells an operation affects based on terrain, height, or slope.
-
 use std::sync::OnceLock;
-
 use crate::model::dimension::Dimension;
-use crate::model::terrain::Terrain;
-use crate::model::tile::{TILE_SIZE, Tile};
+use crate::model::types::Terrain;
+use crate::model::tile::{Tile, TILE_SIZE};
 use crate::ops::operations::{Operation, OperationError, RestoreHeightsOperation};
-
 /// Determines whether a cell should be modified by an operation.
 pub trait Filter: Send + Sync {
     fn name(&self) -> &'static str;
     fn should_apply(&self, tile: &Tile, local_x: usize, local_z: usize) -> bool;
 }
-
 /// Only apply where terrain matches a specific type.
 pub struct TerrainFilter {
     pub terrain: Terrain,
 }
-
 impl Filter for TerrainFilter {
     fn name(&self) -> &'static str {
         "TerrainFilter"
     }
-
     fn should_apply(&self, tile: &Tile, local_x: usize, local_z: usize) -> bool {
         tile.get_terrain(local_x, local_z) == self.terrain as u8
     }
 }
-
 /// Only apply where height is within a range.
 pub struct HeightFilter {
     pub min: i16,
     pub max: i16,
 }
-
 impl Filter for HeightFilter {
     fn name(&self) -> &'static str {
         "HeightFilter"
     }
-
     fn should_apply(&self, tile: &Tile, local_x: usize, local_z: usize) -> bool {
         let h = tile.get_height(local_x, local_z);
         h >= self.min && h <= self.max
@@ -55,7 +46,6 @@ impl Filter for SlopeFilter {
     fn name(&self) -> &'static str {
         "SlopeFilter"
     }
-
     fn should_apply(&self, tile: &Tile, local_x: usize, local_z: usize) -> bool {
         let center = tile.get_height(local_x, local_z);
         let mut max_diff = 0i16;
@@ -91,7 +81,6 @@ impl Filter for CompositeFilter {
     fn name(&self) -> &'static str {
         "CompositeFilter"
     }
-
     fn should_apply(&self, tile: &Tile, local_x: usize, local_z: usize) -> bool {
         match self.combinator {
             FilterCombinator::And => self
@@ -115,7 +104,6 @@ impl Filter for InvertFilter {
     fn name(&self) -> &'static str {
         "InvertFilter"
     }
-
     fn should_apply(&self, tile: &Tile, local_x: usize, local_z: usize) -> bool {
         !self.filter.should_apply(tile, local_x, local_z)
     }
@@ -123,11 +111,7 @@ impl Filter for InvertFilter {
 
 /// Wraps any operation and restricts its effect to cells that pass the filter.
 ///
-/// On apply:
-/// 1. Snapshots all cell heights in the brush area.
-/// 2. Runs the inner operation.
-/// 3. Restores heights of cells that do NOT pass the filter.
-///
+/// On apply: snapshots brush area heights, runs inner op, restores filtered-out cells.
 /// Inverse restores all cells from the snapshot.
 pub struct FilteredOperation {
     pub operation: Box<dyn Operation>,
@@ -148,7 +132,6 @@ impl Operation for FilteredOperation {
     fn apply(&self, dim: &mut Dimension) -> Result<(), OperationError> {
         let is_first_apply = self.before_snapshot.get().is_none();
 
-        // Phase 1: snapshot all cells in brush area (if first apply)
         let snapshot: Vec<(usize, i16)> = if is_first_apply {
             let tile =
                 dim.tiles
@@ -182,10 +165,8 @@ impl Operation for FilteredOperation {
             self.before_snapshot.get().cloned().unwrap_or_default()
         };
 
-        // Phase 2: apply inner operation
         self.operation.apply(dim)?;
 
-        // Phase 3: restore cells that don't pass the filter
         let tile =
             dim.tiles
                 .get_mut(&(self.tile_x, self.tile_z))

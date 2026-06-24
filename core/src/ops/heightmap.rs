@@ -1,6 +1,6 @@
 //! Height map sources — generate height maps from noise, flat, or combined sources.
 
-use crate::model::terrain::Terrain;
+use crate::model::types::Terrain;
 use crate::model::tile::Tile;
 
 /// A source that can generate a height map for a tile.

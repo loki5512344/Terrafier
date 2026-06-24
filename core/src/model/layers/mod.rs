@@ -1,6 +1,10 @@
 //! Layer system — defines the Layer trait and built-in layer types.
 
-pub mod builtin;
+pub mod caves;
+pub mod surface;
+
+pub use caves::{CavesLayer, FrostLayer, RiverLayer};
+pub use surface::{BiomeLayer, ResourcesLayer, TreesLayer};
 
 pub trait Layer: Send + Sync {
     fn id(&self) -> &'static str;
